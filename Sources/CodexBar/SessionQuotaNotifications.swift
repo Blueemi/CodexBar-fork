@@ -8,6 +8,7 @@ enum SessionQuotaTransition: Equatable, Sendable {
     case restored
     case crossedThreshold(percent: Int)
     case windowReset
+    case smartWarning(usedPercent: Int, daysRemaining: Int)
 }
 
 enum SessionQuotaNotificationLogic {
@@ -95,6 +96,34 @@ enum SessionQuotaNotificationLogic {
 
         return false
     }
+
+    /// Returns a smart warning transition if weekly usage crossed the threshold, nil otherwise.
+    static func smartWarningTransition(
+        previousUsedPercent: Double?,
+        currentUsedPercent: Double,
+        threshold: Int,
+        resetsAt: Date?,
+        now: Date = .init()
+    ) -> SessionQuotaTransition? {
+        let thresholdDouble = Double(threshold)
+
+        // Only trigger if we just crossed the threshold
+        let wasBelowThreshold = (previousUsedPercent ?? 0) < thresholdDouble
+        let isAtOrAboveThreshold = currentUsedPercent >= thresholdDouble
+
+        guard wasBelowThreshold, isAtOrAboveThreshold else { return nil }
+
+        // Calculate days remaining
+        let daysRemaining: Int
+        if let resetsAt {
+            let secondsRemaining = resetsAt.timeIntervalSince(now)
+            daysRemaining = max(0, Int(ceil(secondsRemaining / 86400)))
+        } else {
+            daysRemaining = 0
+        }
+
+        return .smartWarning(usedPercent: Int(currentUsedPercent.rounded()), daysRemaining: daysRemaining)
+    }
 }
 
 @MainActor
@@ -124,6 +153,8 @@ final class SessionQuotaNotifier {
             ("\(providerName) at \(percent)% usage", "\(100 - percent)% of session quota remaining.")
         case .windowReset:
             ("\(providerName) limit reset", "Your quota window has reset. Full capacity available.")
+        case let .smartWarning(usedPercent, daysRemaining):
+            self.smartWarningContent(provider: providerName, usedPercent: usedPercent, daysRemaining: daysRemaining)
         }
 
         let providerText = provider.rawValue
@@ -133,9 +164,21 @@ final class SessionQuotaNotifier {
         case .restored: "restored"
         case let .crossedThreshold(percent): "threshold-\(percent)"
         case .windowReset: "window-reset"
+        case .smartWarning: "smartWarning"
         }
         let idPrefix = "session-\(providerText)-\(transitionText)"
         self.logger.info("enqueuing", metadata: ["prefix": idPrefix])
         AppNotifications.shared.post(idPrefix: idPrefix, title: title, body: body, badge: badge)
+    }
+
+    private func smartWarningContent(
+        provider: String,
+        usedPercent: Int,
+        daysRemaining: Int
+    ) -> (String, String) {
+        let title = "\(provider) usage running high"
+        let daysText = daysRemaining == 1 ? "1 day" : "\(daysRemaining) days"
+        let body = "You've used \(usedPercent)% of your weekly limit with \(daysText) remaining."
+        return (title, body)
     }
 }

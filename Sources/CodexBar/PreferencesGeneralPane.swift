@@ -117,6 +117,43 @@ struct GeneralPane: View {
                         }
                     }
 
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle(isOn: self.$settings.smartWarningsEnabled) {
+                            Text("Smart usage warnings")
+                                .font(.body)
+                        }
+                        .toggleStyle(.checkbox)
+
+                        if self.settings.smartWarningsEnabled {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Notifies once when weekly usage crosses your threshold.")
+                                    .font(.footnote)
+                                    .foregroundStyle(.tertiary)
+                                    .fixedSize(horizontal: false, vertical: true)
+
+                                HStack(spacing: 12) {
+                                    Text("Threshold:")
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                    Slider(
+                                        value: Binding(
+                                            get: { Double(self.settings.smartWarningThreshold) },
+                                            set: { self.settings.smartWarningThreshold = Int($0) }
+                                        ),
+                                        in: 50...95,
+                                        step: 5
+                                    )
+                                    .frame(width: 120)
+                                    Text("\(self.settings.smartWarningThreshold)%")
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 35, alignment: .trailing)
+                                }
+                            }
+                            .padding(.leading, 20)
+                        }
+                    }
+
                     PreferenceToggleRow(
                         title: "Notify on quota reset",
                         subtitle: "Sends a notification when your limit window resets.",

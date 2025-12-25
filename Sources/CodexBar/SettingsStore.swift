@@ -97,6 +97,16 @@ final class SettingsStore {
         }
     }
 
+    /// Smart warnings for weekly usage (e.g., "You've used 80% with 4 days remaining").
+    var smartWarningsEnabled: Bool {
+        didSet { self.userDefaults.set(self.smartWarningsEnabled, forKey: "smartWarningsEnabled") }
+    }
+
+    /// Threshold percentage (50-95) for triggering smart usage warnings.
+    var smartWarningThreshold: Int {
+        didSet { self.userDefaults.set(self.smartWarningThreshold, forKey: "smartWarningThreshold") }
+    }
+
     /// When enabled, progress bars show "percent used" instead of "percent left".
     var usageBarsShowUsed: Bool {
         didSet { self.userDefaults.set(self.usageBarsShowUsed, forKey: "usageBarsShowUsed") }
@@ -160,6 +170,8 @@ final class SettingsStore {
         _ = self.alertThresholdsEnabled
         _ = self.alertThreshold
         _ = self.resetRemindersEnabled
+        _ = self.smartWarningsEnabled
+        _ = self.smartWarningThreshold
         _ = self.usageBarsShowUsed
         _ = self.ccusageCostUsageEnabled
         _ = self.randomBlinkEnabled
@@ -210,6 +222,8 @@ final class SettingsStore {
         if resetRemindersDefault == nil {
             self.userDefaults.set(true, forKey: "resetRemindersEnabled")
         }
+        self.smartWarningsEnabled = userDefaults.object(forKey: "smartWarningsEnabled") as? Bool ?? true
+        self.smartWarningThreshold = userDefaults.object(forKey: "smartWarningThreshold") as? Int ?? 65
         self.usageBarsShowUsed = userDefaults.object(forKey: "usageBarsShowUsed") as? Bool ?? false
         self.ccusageCostUsageEnabled = userDefaults.object(forKey: "tokenCostUsageEnabled") as? Bool ?? false
         self.randomBlinkEnabled = userDefaults.object(forKey: "randomBlinkEnabled") as? Bool ?? false
