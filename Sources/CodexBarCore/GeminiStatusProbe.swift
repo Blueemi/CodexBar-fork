@@ -389,15 +389,8 @@ public struct GeminiStatusProbe: Sendable {
         }
 
         // Resolve symlinks to find the actual installation
-        let fm = FileManager.default
-        var realPath = geminiPath
-        if let resolved = try? fm.destinationOfSymbolicLink(atPath: geminiPath) {
-            if resolved.hasPrefix("/") {
-                realPath = resolved
-            } else {
-                realPath = (geminiPath as NSString).deletingLastPathComponent + "/" + resolved
-            }
-        }
+        // Use resolvingSymlinksInPath to fully resolve the symlink chain (needed for fnm)
+        let realPath = URL(fileURLWithPath: geminiPath).resolvingSymlinksInPath().path
 
         // Navigate from bin/gemini to the oauth2.js file
         // Homebrew path: .../libexec/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/code_assist/oauth2.js
