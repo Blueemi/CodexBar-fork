@@ -767,7 +767,7 @@ private final class ProviderSwitcherView: NSView {
                 target: self,
                 action: #selector(self.handleSelection(_:)))
             button.tag = index
-            button.image = Self.paddedImage(segment.image, leading: 1)
+            button.image = Self.paddedImage(segment.image, leading: 4)
             button.imagePosition = .imageLeading
             button.bezelStyle = .regularSquare
             button.isBordered = false
@@ -784,76 +784,27 @@ private final class ProviderSwitcherView: NSView {
             return button
         }
 
-        for (index, segment) in self.segments.enumerated() {
-            let button = makeButton(index: index, segment: segment)
-            self.addSubview(button)
-        }
-
-        // Keep segment widths stable across selected/unselected to avoid shifting.
-        for button in self.buttons {
-            let width = ceil(Self.maxToggleWidth(for: button))
-            if width > 0 {
-                button.widthAnchor.constraint(equalToConstant: width).isActive = true
-            }
-        }
-
         let outerPadding: CGFloat = 12
         let minimumGap: CGFloat = 1
 
-        if self.buttons.count == 2 {
-            let left = self.buttons[0]
-            let right = self.buttons[1]
-            let gap = right.leadingAnchor.constraint(greaterThanOrEqualTo: left.trailingAnchor, constant: minimumGap)
-            gap.priority = .defaultHigh
-            NSLayoutConstraint.activate([
-                left.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: outerPadding),
-                left.centerYAnchor.constraint(equalTo: self.centerYAnchor),
-                right.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -outerPadding),
-                right.centerYAnchor.constraint(equalTo: self.centerYAnchor),
-                gap,
-            ])
-        } else if self.buttons.count == 3 {
-            let left = self.buttons[0]
-            let mid = self.buttons[1]
-            let right = self.buttons[2]
-
-            let leftGap = mid.leadingAnchor.constraint(greaterThanOrEqualTo: left.trailingAnchor, constant: minimumGap)
-            leftGap.priority = .defaultHigh
-            let rightGap = right.leadingAnchor.constraint(
-                greaterThanOrEqualTo: mid.trailingAnchor,
-                constant: minimumGap)
-            rightGap.priority = .defaultHigh
-
-            NSLayoutConstraint.activate([
-                left.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: outerPadding),
-                left.centerYAnchor.constraint(equalTo: self.centerYAnchor),
-                mid.centerXAnchor.constraint(equalTo: self.centerXAnchor),
-                mid.centerYAnchor.constraint(equalTo: self.centerYAnchor),
-                right.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -outerPadding),
-                right.centerYAnchor.constraint(equalTo: self.centerYAnchor),
-                leftGap,
-                rightGap,
-            ])
-        } else if self.buttons.count >= 4 {
-            let stack = NSStackView(views: self.buttons)
-            stack.orientation = .horizontal
-            stack.alignment = .centerY
-            stack.distribution = .equalSpacing
-            stack.spacing = minimumGap
-            stack.translatesAutoresizingMaskIntoConstraints = false
-            self.addSubview(stack)
-
-            NSLayoutConstraint.activate([
-                stack.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: outerPadding),
-                stack.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -outerPadding),
-                stack.centerYAnchor.constraint(equalTo: self.centerYAnchor),
-            ])
-        } else if let first = self.buttons.first {
-            NSLayoutConstraint.activate([
-                first.centerXAnchor.constraint(equalTo: self.centerXAnchor),
-                first.centerYAnchor.constraint(equalTo: self.centerYAnchor),
-            ])
+        for (index, segment) in self.segments.enumerated() {
+            let button = makeButton(index: index, segment: segment)
+            self.buttons.append(button)
         }
+
+        let stack = NSStackView(views: self.buttons)
+        stack.orientation = .horizontal
+        stack.alignment = .centerY
+        stack.distribution = .fillEqually
+        stack.spacing = minimumGap
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        self.addSubview(stack)
+
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: outerPadding),
+            stack.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -outerPadding),
+            stack.centerYAnchor.constraint(equalTo: self.centerYAnchor),
+        ])
 
         self.updateButtonStyles()
     }
