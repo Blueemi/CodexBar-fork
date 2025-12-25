@@ -1,6 +1,6 @@
 import Foundation
-#if canImport(os.log)
-import os.log
+#if canImport(FoundationNetworking)
+import FoundationNetworking
 #endif
 
 public struct AntigravityModelQuota: Sendable {
@@ -145,9 +145,7 @@ public struct AntigravityStatusProbe: Sendable {
     private static let commandModelConfigPath =
         "/exa.language_server_pb.LanguageServerService/GetCommandModelConfigs"
     private static let unleashPath = "/exa.language_server_pb.LanguageServerService/GetUnleashData"
-    #if canImport(os.log)
-    private static let log = Logger(subsystem: "com.steipete.codexbar", category: "antigravity")
-    #endif
+    private static let log = CodexBarLog.logger("antigravity")
 
     public init(timeout: TimeInterval = 8.0) {
         self.timeout = timeout
@@ -427,12 +425,10 @@ public struct AntigravityStatusProbe: Sendable {
                     timeout: timeout))
             return true
         } catch {
-            #if canImport(os.log)
-            if #available(macOS 13.0, *) {
-                self.log
-                    .debug("[Antigravity] Port \(port) probe failed: \(error.localizedDescription, privacy: .public)")
-            }
-            #endif
+            self.log.debug("Port probe failed", metadata: [
+                "port": "\(port)",
+                "error": error.localizedDescription,
+            ])
             return false
         }
     }
@@ -544,11 +540,13 @@ private final class InsecureSessionDelegate: NSObject, URLSessionDelegate {
         didReceive challenge: URLAuthenticationChallenge,
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void)
     {
+        #if os(macOS)
         if let trust = challenge.protectionSpace.serverTrust {
             completionHandler(.useCredential, URLCredential(trust: trust))
-        } else {
-            completionHandler(.performDefaultHandling, nil)
+            return
         }
+        #endif
+        completionHandler(.performDefaultHandling, nil)
     }
 }
 
