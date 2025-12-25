@@ -170,7 +170,7 @@ struct DebugPane: View {
 
                 SettingsSection(
                     title: "Notifications",
-                    caption: "Trigger test notifications for the 5-hour session window (depleted/restored).")
+                    caption: "Trigger test notifications for the 5-hour session window (depleted/restored/thresholds).")
                 {
                     Picker("Provider", selection: self.$currentLogProvider) {
                         Text("Codex").tag(UsageProvider.codex)
@@ -193,6 +193,24 @@ struct DebugPane: View {
                             Label("Post restored", systemImage: "bell")
                         }
                         .controlSize(.small)
+                    }
+
+                    Text("Threshold alerts")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 4)
+
+                    HStack(spacing: 12) {
+                        ForEach([50, 75, 90], id: \.self) { threshold in
+                            Button {
+                                self.postSessionNotification(
+                                    .crossedThreshold(percent: threshold),
+                                    provider: self.currentLogProvider)
+                            } label: {
+                                Text("\(threshold)%")
+                            }
+                            .controlSize(.small)
+                        }
                     }
                 }
 

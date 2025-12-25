@@ -190,6 +190,7 @@ final class UsageStore {
     @ObservationIgnored private var tokenTimerTask: Task<Void, Never>?
     @ObservationIgnored private var tokenRefreshSequenceTask: Task<Void, Never>?
     @ObservationIgnored private var lastKnownSessionRemaining: [UsageProvider: Double] = [:]
+    @ObservationIgnored private var lastNotifiedThresholds: [UsageProvider: Set<Int>] = [:]
     @ObservationIgnored private(set) var lastTokenFetchAt: [UsageProvider: Date] = [:]
     @ObservationIgnored private let tokenFetchTTL: TimeInterval = 60 * 60
     @ObservationIgnored private let tokenFetchTimeout: TimeInterval = 10 * 60
@@ -473,6 +474,12 @@ final class UsageStore {
 
         defer { self.lastKnownSessionRemaining[provider] = currentRemaining }
 
+        // Handle threshold alerts first (separate from depleted/restored notifications)
+        self.handleThresholdAlerts(
+            provider: provider,
+            previousRemaining: previousRemaining,
+            currentRemaining: currentRemaining)
+
         guard self.settings.sessionQuotaNotificationsEnabled else {
             if SessionQuotaNotificationLogic.isDepleted(currentRemaining) ||
                 SessionQuotaNotificationLogic.isDepleted(previousRemaining)
@@ -520,6 +527,51 @@ final class UsageStore {
         self.sessionQuotaLogger.info(message)
 
         self.sessionQuotaNotifier.post(transition: transition, provider: provider)
+    }
+
+    private func handleThresholdAlerts(
+        provider: UsageProvider,
+        previousRemaining: Double?,
+        currentRemaining: Double?)
+    {
+        guard self.settings.alertThresholdsEnabled else { return }
+        guard !self.settings.alertThresholds.isEmpty else { return }
+
+        let alreadyNotified = self.lastNotifiedThresholds[provider] ?? []
+
+        // Check for cleared thresholds (usage went back down, so we can re-alert)
+        let cleared = SessionQuotaNotificationLogic.clearedThresholds(
+            previousRemaining: previousRemaining,
+            currentRemaining: currentRemaining,
+            alreadyNotified: alreadyNotified)
+        if !cleared.isEmpty {
+            var updated = alreadyNotified
+            for threshold in cleared {
+                updated.remove(threshold)
+            }
+            self.lastNotifiedThresholds[provider] = updated
+            self.sessionQuotaLogger.debug(
+                "cleared thresholds: provider=\(provider.rawValue) thresholds=\(cleared)")
+        }
+
+        // Check for newly crossed thresholds
+        let crossed = SessionQuotaNotificationLogic.crossedThresholds(
+            previousRemaining: previousRemaining,
+            currentRemaining: currentRemaining,
+            enabledThresholds: self.settings.alertThresholds,
+            alreadyNotified: self.lastNotifiedThresholds[provider] ?? [])
+
+        for threshold in crossed {
+            var current = self.lastNotifiedThresholds[provider] ?? []
+            current.insert(threshold)
+            self.lastNotifiedThresholds[provider] = current
+
+            self.sessionQuotaLogger.info(
+                "threshold crossed: provider=\(provider.rawValue) threshold=\(threshold)%")
+            self.sessionQuotaNotifier.post(
+                transition: .crossedThreshold(percent: threshold),
+                provider: provider)
+        }
     }
 
     private func refreshStatus(_ provider: UsageProvider) async {

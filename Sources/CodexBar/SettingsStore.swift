@@ -73,6 +73,24 @@ final class SettingsStore {
         }
     }
 
+    /// When enabled, push notifications are sent when usage hits configured thresholds.
+    var alertThresholdsEnabled: Bool {
+        didSet {
+            self.userDefaults.set(self.alertThresholdsEnabled, forKey: "alertThresholdsEnabled")
+        }
+    }
+
+    /// Default thresholds: 50%, 75%, 90%.
+    static let defaultAlertThresholds: Set<Int> = [50, 75, 90]
+
+    /// Enabled alert thresholds (usage percentages that trigger notifications).
+    var alertThresholds: Set<Int> {
+        didSet {
+            let array = Array(self.alertThresholds)
+            self.userDefaults.set(array, forKey: "alertThresholds")
+        }
+    }
+
     /// When enabled, progress bars show "percent used" instead of "percent left".
     var usageBarsShowUsed: Bool {
         didSet { self.userDefaults.set(self.usageBarsShowUsed, forKey: "usageBarsShowUsed") }
@@ -133,6 +151,8 @@ final class SettingsStore {
         _ = self.debugMenuEnabled
         _ = self.statusChecksEnabled
         _ = self.sessionQuotaNotificationsEnabled
+        _ = self.alertThresholdsEnabled
+        _ = self.alertThresholds
         _ = self.usageBarsShowUsed
         _ = self.ccusageCostUsageEnabled
         _ = self.randomBlinkEnabled
@@ -166,6 +186,17 @@ final class SettingsStore {
         self.sessionQuotaNotificationsEnabled = sessionQuotaNotificationsDefault ?? true
         if sessionQuotaNotificationsDefault == nil {
             self.userDefaults.set(true, forKey: "sessionQuotaNotificationsEnabled")
+        }
+        let alertThresholdsDefault = userDefaults.object(forKey: "alertThresholdsEnabled") as? Bool
+        self.alertThresholdsEnabled = alertThresholdsDefault ?? true
+        if alertThresholdsDefault == nil {
+            self.userDefaults.set(true, forKey: "alertThresholdsEnabled")
+        }
+        if let savedThresholds = userDefaults.array(forKey: "alertThresholds") as? [Int] {
+            self.alertThresholds = Set(savedThresholds)
+        } else {
+            self.alertThresholds = Self.defaultAlertThresholds
+            self.userDefaults.set(Array(Self.defaultAlertThresholds), forKey: "alertThresholds")
         }
         self.usageBarsShowUsed = userDefaults.object(forKey: "usageBarsShowUsed") as? Bool ?? false
         self.ccusageCostUsageEnabled = userDefaults.object(forKey: "tokenCostUsageEnabled") as? Bool ?? false

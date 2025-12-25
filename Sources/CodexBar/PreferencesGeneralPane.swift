@@ -80,6 +80,32 @@ struct GeneralPane: View {
                         subtitle: "Notifies when the 5-hour session quota hits 0% and when it becomes " +
                             "available again.",
                         binding: self.$settings.sessionQuotaNotificationsEnabled)
+
+                    VStack(alignment: .leading, spacing: 5.4) {
+                        Toggle(isOn: self.$settings.alertThresholdsEnabled) {
+                            Text("Alert at usage thresholds")
+                                .font(.body)
+                        }
+                        .toggleStyle(.checkbox)
+
+                        Text("Notifies when usage reaches configured thresholds.")
+                            .font(.footnote)
+                            .foregroundStyle(.tertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        if self.settings.alertThresholdsEnabled {
+                            HStack(spacing: 16) {
+                                ForEach([50, 75, 90], id: \.self) { threshold in
+                                    Toggle(isOn: self.thresholdBinding(for: threshold)) {
+                                        Text("\(threshold)%")
+                                            .font(.footnote)
+                                    }
+                                    .toggleStyle(.checkbox)
+                                }
+                            }
+                            .padding(.top, 4)
+                        }
+                    }
                 }
 
                 Divider()
@@ -153,5 +179,17 @@ struct GeneralPane: View {
         return Text("\(name): no data yet")
             .font(.footnote)
             .foregroundStyle(.tertiary)
+    }
+
+    private func thresholdBinding(for threshold: Int) -> Binding<Bool> {
+        Binding(
+            get: { self.settings.alertThresholds.contains(threshold) },
+            set: { newValue in
+                if newValue {
+                    self.settings.alertThresholds.insert(threshold)
+                } else {
+                    self.settings.alertThresholds.remove(threshold)
+                }
+            })
     }
 }
