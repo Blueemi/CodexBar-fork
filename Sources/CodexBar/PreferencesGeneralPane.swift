@@ -131,8 +131,8 @@ struct GeneralPane: View {
                                     .foregroundStyle(.tertiary)
                                     .fixedSize(horizontal: false, vertical: true)
 
-                                HStack(spacing: 12) {
-                                    Text("Threshold:")
+                                HStack(spacing: 8) {
+                                    Text("50%")
                                         .font(.footnote)
                                         .foregroundStyle(.secondary)
                                     Slider(
