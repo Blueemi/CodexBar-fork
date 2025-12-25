@@ -94,14 +94,24 @@ struct GeneralPane: View {
                             .fixedSize(horizontal: false, vertical: true)
 
                         if self.settings.alertThresholdsEnabled {
-                            HStack(spacing: 16) {
-                                ForEach([50, 75, 90], id: \.self) { threshold in
-                                    Toggle(isOn: self.thresholdBinding(for: threshold)) {
-                                        Text("\(threshold)%")
-                                            .font(.footnote)
-                                    }
-                                    .toggleStyle(.checkbox)
-                                }
+                            HStack(spacing: 8) {
+                                Text("10%")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 32, alignment: .trailing)
+                                Slider(
+                                    value: Binding(
+                                        get: { Double(self.settings.alertThreshold) },
+                                        set: { self.settings.alertThreshold = Int($0) }
+                                    ),
+                                    in: 10...100,
+                                    step: 5
+                                )
+                                .frame(width: 180)
+                                Text("\(self.settings.alertThreshold)%")
+                                    .font(.footnote.monospacedDigit())
+                                    .foregroundStyle(.primary)
+                                    .frame(width: 40, alignment: .leading)
                             }
                             .padding(.top, 4)
                         }
@@ -181,15 +191,4 @@ struct GeneralPane: View {
             .foregroundStyle(.tertiary)
     }
 
-    private func thresholdBinding(for threshold: Int) -> Binding<Bool> {
-        Binding(
-            get: { self.settings.alertThresholds.contains(threshold) },
-            set: { newValue in
-                if newValue {
-                    self.settings.alertThresholds.insert(threshold)
-                } else {
-                    self.settings.alertThresholds.remove(threshold)
-                }
-            })
-    }
 }

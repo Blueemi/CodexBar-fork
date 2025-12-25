@@ -80,14 +80,13 @@ final class SettingsStore {
         }
     }
 
-    /// Default thresholds: 50%, 75%, 90%.
-    static let defaultAlertThresholds: Set<Int> = [50, 75, 90]
+    /// Default threshold: 75%.
+    static let defaultAlertThreshold: Int = 75
 
-    /// Enabled alert thresholds (usage percentages that trigger notifications).
-    var alertThresholds: Set<Int> {
+    /// Alert threshold (usage percentage that triggers notification).
+    var alertThreshold: Int {
         didSet {
-            let array = Array(self.alertThresholds)
-            self.userDefaults.set(array, forKey: "alertThresholds")
+            self.userDefaults.set(self.alertThreshold, forKey: "alertThreshold")
         }
     }
 
@@ -152,7 +151,7 @@ final class SettingsStore {
         _ = self.statusChecksEnabled
         _ = self.sessionQuotaNotificationsEnabled
         _ = self.alertThresholdsEnabled
-        _ = self.alertThresholds
+        _ = self.alertThreshold
         _ = self.usageBarsShowUsed
         _ = self.ccusageCostUsageEnabled
         _ = self.randomBlinkEnabled
@@ -192,11 +191,11 @@ final class SettingsStore {
         if alertThresholdsDefault == nil {
             self.userDefaults.set(true, forKey: "alertThresholdsEnabled")
         }
-        if let savedThresholds = userDefaults.array(forKey: "alertThresholds") as? [Int] {
-            self.alertThresholds = Set(savedThresholds)
+        if let savedThreshold = userDefaults.object(forKey: "alertThreshold") as? Int {
+            self.alertThreshold = savedThreshold
         } else {
-            self.alertThresholds = Self.defaultAlertThresholds
-            self.userDefaults.set(Array(Self.defaultAlertThresholds), forKey: "alertThresholds")
+            self.alertThreshold = Self.defaultAlertThreshold
+            self.userDefaults.set(Self.defaultAlertThreshold, forKey: "alertThreshold")
         }
         self.usageBarsShowUsed = userDefaults.object(forKey: "usageBarsShowUsed") as? Bool ?? false
         self.ccusageCostUsageEnabled = userDefaults.object(forKey: "tokenCostUsageEnabled") as? Bool ?? false

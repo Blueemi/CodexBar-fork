@@ -29,54 +29,42 @@ enum SessionQuotaNotificationLogic {
         return .none
     }
 
-    /// Returns thresholds that were crossed going from previousRemaining to currentRemaining.
+    /// Returns true if the single threshold was crossed going from previousRemaining to currentRemaining.
     /// A threshold is "crossed" when previous was above it and current is at or below it.
-    /// Note: remaining is in percent (0-100), thresholds are usage percent (e.g., 50 = 50% used = 50% remaining).
-    static func crossedThresholds(
+    /// Note: remaining is in percent (0-100), threshold is usage percent (e.g., 75 = 75% used = 25% remaining).
+    static func crossedThreshold(
         previousRemaining: Double?,
         currentRemaining: Double?,
-        enabledThresholds: Set<Int>,
-        alreadyNotified: Set<Int>) -> [Int]
+        threshold: Int,
+        alreadyNotified: Bool) -> Bool
     {
-        guard let currentRemaining, let previousRemaining else { return [] }
-        guard currentRemaining < previousRemaining else { return [] }
+        guard !alreadyNotified else { return false }
+        guard let currentRemaining, let previousRemaining else { return false }
+        guard currentRemaining < previousRemaining else { return false }
 
         // Convert "remaining percent" to "used percent" for threshold comparison
         // remaining 50% = used 50%, remaining 25% = used 75%, remaining 10% = used 90%
         let previousUsed = 100.0 - previousRemaining
         let currentUsed = 100.0 - currentRemaining
+        let thresholdDouble = Double(threshold)
 
-        var crossed: [Int] = []
-        for threshold in enabledThresholds.sorted() {
-            let thresholdDouble = Double(threshold)
-            // Crossed if we went from below threshold to at or above it
-            if previousUsed < thresholdDouble, currentUsed >= thresholdDouble {
-                if !alreadyNotified.contains(threshold) {
-                    crossed.append(threshold)
-                }
-            }
-        }
-        return crossed
+        // Crossed if we went from below threshold to at or above it
+        return previousUsed < thresholdDouble && currentUsed >= thresholdDouble
     }
 
-    /// Returns thresholds that should be cleared (user is now below them).
-    /// These can be notified again if usage increases past them.
-    static func clearedThresholds(
+    /// Returns true if the threshold should be cleared (user is now below it).
+    /// The threshold can be notified again if usage increases past it.
+    static func clearedThreshold(
         previousRemaining: Double?,
         currentRemaining: Double?,
-        alreadyNotified: Set<Int>) -> Set<Int>
+        threshold: Int,
+        alreadyNotified: Bool) -> Bool
     {
-        guard let currentRemaining else { return [] }
+        guard alreadyNotified else { return false }
+        guard let currentRemaining else { return false }
         let currentUsed = 100.0 - currentRemaining
-
-        var cleared: Set<Int> = []
-        for threshold in alreadyNotified {
-            // If current usage is now below this threshold, clear it
-            if currentUsed < Double(threshold) {
-                cleared.insert(threshold)
-            }
-        }
-        return cleared
+        // If current usage is now below this threshold, clear it
+        return currentUsed < Double(threshold)
     }
 }
 
