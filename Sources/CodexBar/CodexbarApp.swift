@@ -35,11 +35,14 @@ struct CodexBarApp: App {
     var body: some Scene {
         // Hidden 1×1 window to keep SwiftUI's lifecycle alive so `Settings` scene
         // shows the native toolbar tabs even though the UI is AppKit-based.
-        WindowGroup("CodexBarLifecycleKeepalive") {
+        // Using `Window` (not `WindowGroup`) to guarantee a single instance—this
+        // prevents multiple UsageStores from spawning redundant CLI probes.
+        Window("CodexBarLifecycleKeepalive", id: "lifecycle-keepalive") {
             HiddenWindowView()
         }
         .defaultSize(width: 20, height: 20)
         .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
 
         Settings {
             PreferencesView(
