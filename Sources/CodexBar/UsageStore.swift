@@ -193,6 +193,8 @@ final class UsageStore {
     @ObservationIgnored private var tokenTimerTask: Task<Void, Never>?
     @ObservationIgnored private var tokenRefreshSequenceTask: Task<Void, Never>?
     @ObservationIgnored private var lastKnownSessionRemaining: [UsageProvider: Double] = [:]
+    @ObservationIgnored private var lastKnownWeeklyUsedPercent: [UsageProvider: Double] = [:]
+    @ObservationIgnored private var smartWarningFiredForWindow: [UsageProvider: Date?] = [:]
     @ObservationIgnored private(set) var lastTokenFetchAt: [UsageProvider: Date] = [:]
     @ObservationIgnored private let tokenFetchTTL: TimeInterval = 60 * 60
     @ObservationIgnored private let tokenFetchTimeout: TimeInterval = 10 * 60
@@ -447,6 +449,7 @@ final class UsageStore {
             let snapshot = try await task.value
             await MainActor.run {
                 self.handleSessionQuotaTransition(provider: provider, snapshot: snapshot)
+                self.handleSmartWarningTransition(provider: provider, snapshot: snapshot)
                 self.snapshots[provider] = snapshot
                 self.errors[provider] = nil
                 self.failureGates[provider]?.recordSuccess()
@@ -523,6 +526,51 @@ final class UsageStore {
         self.sessionQuotaLogger.info("\(message, privacy: .public)")
 
         self.sessionQuotaNotifier.post(transition: transition, provider: provider)
+    }
+
+    private func handleSmartWarningTransition(provider: UsageProvider, snapshot: UsageSnapshot) {
+        // Smart warnings are for weekly limits only (Codex and Claude)
+        guard provider == .codex || provider == .claude else { return }
+        guard let secondary = snapshot.secondary else { return }
+        guard self.settings.smartWarningsEnabled else { return }
+
+        let currentUsedPercent = secondary.usedPercent
+        let previousUsedPercent = self.lastKnownWeeklyUsedPercent[provider]
+        let threshold = self.settings.smartWarningThreshold
+        let resetsAt = secondary.resetsAt
+
+        defer { self.lastKnownWeeklyUsedPercent[provider] = currentUsedPercent }
+
+        // Reset the "fired" flag if the window has reset (new resetsAt date)
+        if let resetsAt,
+           let lastFiredFor = self.smartWarningFiredForWindow[provider],
+           let lastFiredDate = lastFiredFor,
+           resetsAt > lastFiredDate
+        {
+            self.smartWarningFiredForWindow[provider] = nil
+        }
+
+        // Don't fire if we already fired for this window
+        if self.smartWarningFiredForWindow[provider] != nil {
+            return
+        }
+
+        // Check for smart warning transition
+        guard let smartWarning = SessionQuotaNotificationLogic.smartWarningTransition(
+            previousUsedPercent: previousUsedPercent,
+            currentUsedPercent: currentUsedPercent,
+            threshold: threshold,
+            resetsAt: resetsAt
+        ) else { return }
+
+        // Mark as fired for this window
+        self.smartWarningFiredForWindow[provider] = resetsAt
+
+        let providerText = provider.rawValue
+        self.sessionQuotaLogger.info(
+            "smart warning: provider=\(providerText, privacy: .public) used=\(currentUsedPercent) threshold=\(threshold)")
+
+        self.sessionQuotaNotifier.post(transition: smartWarning, provider: provider)
     }
 
     private func refreshStatus(_ provider: UsageProvider) async {
