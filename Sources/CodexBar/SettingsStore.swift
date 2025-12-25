@@ -91,6 +91,13 @@ final class SettingsStore {
         }
     }
 
+    /// When enabled, push notifications are sent when a limit window resets.
+    var resetRemindersEnabled: Bool {
+        didSet {
+            self.userDefaults.set(self.resetRemindersEnabled, forKey: "resetRemindersEnabled")
+        }
+    }
+
     /// When enabled, progress bars show "percent used" instead of "percent left".
     var usageBarsShowUsed: Bool {
         didSet { self.userDefaults.set(self.usageBarsShowUsed, forKey: "usageBarsShowUsed") }
@@ -153,6 +160,7 @@ final class SettingsStore {
         _ = self.sessionQuotaNotificationsEnabled
         _ = self.alertThresholdsEnabled
         _ = self.alertThresholds
+        _ = self.resetRemindersEnabled
         _ = self.usageBarsShowUsed
         _ = self.ccusageCostUsageEnabled
         _ = self.randomBlinkEnabled
@@ -197,6 +205,11 @@ final class SettingsStore {
         } else {
             self.alertThresholds = Self.defaultAlertThresholds
             self.userDefaults.set(Array(Self.defaultAlertThresholds), forKey: "alertThresholds")
+        }
+        let resetRemindersDefault = userDefaults.object(forKey: "resetRemindersEnabled") as? Bool
+        self.resetRemindersEnabled = resetRemindersDefault ?? true
+        if resetRemindersDefault == nil {
+            self.userDefaults.set(true, forKey: "resetRemindersEnabled")
         }
         self.usageBarsShowUsed = userDefaults.object(forKey: "usageBarsShowUsed") as? Bool ?? false
         self.ccusageCostUsageEnabled = userDefaults.object(forKey: "tokenCostUsageEnabled") as? Bool ?? false

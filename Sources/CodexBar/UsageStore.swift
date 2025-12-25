@@ -190,6 +190,7 @@ final class UsageStore {
     @ObservationIgnored private var tokenTimerTask: Task<Void, Never>?
     @ObservationIgnored private var tokenRefreshSequenceTask: Task<Void, Never>?
     @ObservationIgnored private var lastKnownSessionRemaining: [UsageProvider: Double] = [:]
+    @ObservationIgnored private var lastKnownResetsAt: [UsageProvider: Date?] = [:]
     @ObservationIgnored private var lastNotifiedThresholds: [UsageProvider: Set<Int>] = [:]
     @ObservationIgnored private(set) var lastTokenFetchAt: [UsageProvider: Date] = [:]
     @ObservationIgnored private let tokenFetchTTL: TimeInterval = 60 * 60
@@ -471,10 +472,23 @@ final class UsageStore {
     private func handleSessionQuotaTransition(provider: UsageProvider, snapshot: UsageSnapshot) {
         let currentRemaining = snapshot.primary.remainingPercent
         let previousRemaining = self.lastKnownSessionRemaining[provider]
+        let currentResetsAt = snapshot.primary.resetsAt
+        let previousResetsAt = self.lastKnownResetsAt[provider] ?? nil
 
-        defer { self.lastKnownSessionRemaining[provider] = currentRemaining }
+        defer {
+            self.lastKnownSessionRemaining[provider] = currentRemaining
+            self.lastKnownResetsAt[provider] = currentResetsAt
+        }
 
-        // Handle threshold alerts first (separate from depleted/restored notifications)
+        // Handle window reset reminders
+        self.handleWindowResetReminder(
+            provider: provider,
+            previousResetsAt: previousResetsAt,
+            currentResetsAt: currentResetsAt,
+            previousRemaining: previousRemaining,
+            currentRemaining: currentRemaining)
+
+        // Handle threshold alerts (separate from depleted/restored notifications)
         self.handleThresholdAlerts(
             provider: provider,
             previousRemaining: previousRemaining,
@@ -572,6 +586,31 @@ final class UsageStore {
                 transition: .crossedThreshold(percent: threshold),
                 provider: provider)
         }
+    }
+
+    private func handleWindowResetReminder(
+        provider: UsageProvider,
+        previousResetsAt: Date?,
+        currentResetsAt: Date?,
+        previousRemaining: Double?,
+        currentRemaining: Double?)
+    {
+        guard self.settings.resetRemindersEnabled else { return }
+
+        // Skip notification on first fetch (no previous data to compare)
+        guard previousRemaining != nil else { return }
+
+        let isReset = SessionQuotaNotificationLogic.detectWindowReset(
+            previousResetsAt: previousResetsAt,
+            currentResetsAt: currentResetsAt,
+            previousRemaining: previousRemaining,
+            currentRemaining: currentRemaining)
+
+        guard isReset else { return }
+
+        self.sessionQuotaLogger.info(
+            "window reset: provider=\(provider.rawValue) prevReset=\(previousResetsAt?.description ?? "nil") currReset=\(currentResetsAt?.description ?? "nil")")
+        self.sessionQuotaNotifier.post(transition: .windowReset, provider: provider)
     }
 
     private func refreshStatus(_ provider: UsageProvider) async {

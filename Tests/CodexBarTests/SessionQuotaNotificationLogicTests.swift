@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import CodexBar
 
@@ -155,5 +156,94 @@ struct SessionQuotaNotificationLogicTests {
             currentRemaining: 40,
             alreadyNotified: [50, 75])
         #expect(cleared == [75])
+    }
+
+    // MARK: - Window Reset Detection Tests
+
+    @Test
+    func detectsWindowResetWhenPreviousTimeExpired() {
+        let now = Date()
+        let previousResetsAt = now.addingTimeInterval(-60) // 1 minute ago (expired)
+        let currentResetsAt = now.addingTimeInterval(3600) // 1 hour in future
+        
+        let isReset = SessionQuotaNotificationLogic.detectWindowReset(
+            previousResetsAt: previousResetsAt,
+            currentResetsAt: currentResetsAt,
+            previousRemaining: 30,
+            currentRemaining: 100,
+            now: now)
+        #expect(isReset == true)
+    }
+
+    @Test
+    func detectsWindowResetFromUsageJump() {
+        let now = Date()
+        let currentResetsAt = now.addingTimeInterval(3600) // 1 hour in future
+        
+        // Previous remaining was low (40%), now it's high (95%) - quota refilled
+        let isReset = SessionQuotaNotificationLogic.detectWindowReset(
+            previousResetsAt: nil,
+            currentResetsAt: currentResetsAt,
+            previousRemaining: 40,
+            currentRemaining: 95,
+            now: now)
+        #expect(isReset == true)
+    }
+
+    @Test
+    func ignoresWindowResetWhenNoChange() {
+        let now = Date()
+        let resetsAt = now.addingTimeInterval(3600) // Same reset time
+        
+        let isReset = SessionQuotaNotificationLogic.detectWindowReset(
+            previousResetsAt: resetsAt,
+            currentResetsAt: resetsAt,
+            previousRemaining: 80,
+            currentRemaining: 75,
+            now: now)
+        #expect(isReset == false)
+    }
+
+    @Test
+    func ignoresWindowResetWhenBothNil() {
+        let now = Date()
+        
+        let isReset = SessionQuotaNotificationLogic.detectWindowReset(
+            previousResetsAt: nil,
+            currentResetsAt: nil,
+            previousRemaining: 80,
+            currentRemaining: 75,
+            now: now)
+        #expect(isReset == false)
+    }
+
+    @Test
+    func ignoresWindowResetWhenCurrentResetInPast() {
+        let now = Date()
+        let previousResetsAt = now.addingTimeInterval(-120) // 2 minutes ago
+        let currentResetsAt = now.addingTimeInterval(-60) // 1 minute ago (still in past)
+        
+        let isReset = SessionQuotaNotificationLogic.detectWindowReset(
+            previousResetsAt: previousResetsAt,
+            currentResetsAt: currentResetsAt,
+            previousRemaining: 30,
+            currentRemaining: 100,
+            now: now)
+        #expect(isReset == false)
+    }
+
+    @Test
+    func ignoresSmallUsageRecovery() {
+        let now = Date()
+        let currentResetsAt = now.addingTimeInterval(3600)
+        
+        // Previous was 55%, now 60% - small recovery, not a reset
+        let isReset = SessionQuotaNotificationLogic.detectWindowReset(
+            previousResetsAt: nil,
+            currentResetsAt: currentResetsAt,
+            previousRemaining: 55,
+            currentRemaining: 60,
+            now: now)
+        #expect(isReset == false)
     }
 }

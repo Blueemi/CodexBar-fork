@@ -7,6 +7,7 @@ enum SessionQuotaTransition: Equatable, Sendable {
     case depleted
     case restored
     case crossedThreshold(percent: Int)
+    case windowReset
 }
 
 enum SessionQuotaNotificationLogic {
@@ -78,6 +79,34 @@ enum SessionQuotaNotificationLogic {
         }
         return cleared
     }
+
+    /// Detects when a limit window has reset.
+    /// Returns true when the previous resetsAt was in the past (or nil on first fetch but usage jumped up),
+    /// and the new resetsAt is in the future, indicating a new window started.
+    static func detectWindowReset(
+        previousResetsAt: Date?,
+        currentResetsAt: Date?,
+        previousRemaining: Double?,
+        currentRemaining: Double?,
+        now: Date = Date()) -> Bool
+    {
+        // Must have a current reset time in the future
+        guard let currentResetsAt, currentResetsAt > now else { return false }
+
+        // If we had a previous reset time that's now in the past, window reset occurred
+        if let previousResetsAt, previousResetsAt <= now {
+            return true
+        }
+
+        // Also detect if remaining jumped significantly up (refilled), indicating reset
+        // This catches cases where we didn't have resetsAt previously
+        if let previousRemaining, let currentRemaining,
+           previousRemaining < 50, currentRemaining >= 90 {
+            return true
+        }
+
+        return false
+    }
 }
 
 @MainActor
@@ -105,6 +134,8 @@ final class SessionQuotaNotifier {
             ("\(providerName) session restored", "Session quota is available again.")
         case let .crossedThreshold(percent):
             ("\(providerName) at \(percent)% usage", "\(100 - percent)% of session quota remaining.")
+        case .windowReset:
+            ("\(providerName) limit reset", "Your quota window has reset. Full capacity available.")
         }
 
         let providerText = provider.rawValue
@@ -113,6 +144,7 @@ final class SessionQuotaNotifier {
         case .depleted: "depleted"
         case .restored: "restored"
         case let .crossedThreshold(percent): "threshold-\(percent)"
+        case .windowReset: "window-reset"
         }
         let idPrefix = "session-\(providerText)-\(transitionText)"
         self.logger.info("enqueuing", metadata: ["prefix": idPrefix])

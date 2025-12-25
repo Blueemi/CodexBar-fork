@@ -106,6 +106,11 @@ struct GeneralPane: View {
                             .padding(.top, 4)
                         }
                     }
+
+                    PreferenceToggleRow(
+                        title: "Notify on quota reset",
+                        subtitle: "Sends a notification when your limit window resets.",
+                        binding: self.$settings.resetRemindersEnabled)
                 }
 
                 Divider()
