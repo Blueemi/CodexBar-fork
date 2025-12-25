@@ -191,7 +191,7 @@ final class UsageStore {
     @ObservationIgnored private var tokenRefreshSequenceTask: Task<Void, Never>?
     @ObservationIgnored private var lastKnownSessionRemaining: [UsageProvider: Double] = [:]
     @ObservationIgnored private var lastKnownResetsAt: [UsageProvider: Date?] = [:]
-    @ObservationIgnored private var lastNotifiedThresholds: [UsageProvider: Set<Int>] = [:]
+    @ObservationIgnored private var lastNotifiedThreshold: [UsageProvider: Bool] = [:]
     @ObservationIgnored private(set) var lastTokenFetchAt: [UsageProvider: Date] = [:]
     @ObservationIgnored private let tokenFetchTTL: TimeInterval = 60 * 60
     @ObservationIgnored private let tokenFetchTimeout: TimeInterval = 10 * 60
@@ -549,37 +549,31 @@ final class UsageStore {
         currentRemaining: Double?)
     {
         guard self.settings.alertThresholdsEnabled else { return }
-        guard !self.settings.alertThresholds.isEmpty else { return }
 
-        let alreadyNotified = self.lastNotifiedThresholds[provider] ?? []
+        let threshold = self.settings.alertThreshold
+        let alreadyNotified = self.lastNotifiedThreshold[provider] ?? false
 
-        // Check for cleared thresholds (usage went back down, so we can re-alert)
-        let cleared = SessionQuotaNotificationLogic.clearedThresholds(
+        // Check if threshold was cleared (usage went back down, so we can re-alert)
+        let cleared = SessionQuotaNotificationLogic.clearedThreshold(
             previousRemaining: previousRemaining,
             currentRemaining: currentRemaining,
+            threshold: threshold,
             alreadyNotified: alreadyNotified)
-        if !cleared.isEmpty {
-            var updated = alreadyNotified
-            for threshold in cleared {
-                updated.remove(threshold)
-            }
-            self.lastNotifiedThresholds[provider] = updated
+        if cleared {
+            self.lastNotifiedThreshold[provider] = false
             self.sessionQuotaLogger.debug(
-                "cleared thresholds: provider=\(provider.rawValue) thresholds=\(cleared)")
+                "cleared threshold: provider=\(provider.rawValue) threshold=\(threshold)%")
         }
 
-        // Check for newly crossed thresholds
-        let crossed = SessionQuotaNotificationLogic.crossedThresholds(
+        // Check if threshold was newly crossed
+        let crossed = SessionQuotaNotificationLogic.crossedThreshold(
             previousRemaining: previousRemaining,
             currentRemaining: currentRemaining,
-            enabledThresholds: self.settings.alertThresholds,
-            alreadyNotified: self.lastNotifiedThresholds[provider] ?? [])
-
-        for threshold in crossed {
-            var current = self.lastNotifiedThresholds[provider] ?? []
-            current.insert(threshold)
-            self.lastNotifiedThresholds[provider] = current
-
+            threshold: threshold,
+            alreadyNotified: self.lastNotifiedThreshold[provider] ?? false)
+        
+        if crossed {
+            self.lastNotifiedThreshold[provider] = true
             self.sessionQuotaLogger.info(
                 "threshold crossed: provider=\(provider.rawValue) threshold=\(threshold)%")
             self.sessionQuotaNotifier.post(

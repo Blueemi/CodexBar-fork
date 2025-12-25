@@ -40,90 +40,67 @@ struct SessionQuotaNotificationLogicTests {
     @Test
     func detectsThreshold50Crossed() {
         // remaining 60% -> remaining 45% means used went from 40% to 55%, crossing 50%
-        let crossed = SessionQuotaNotificationLogic.crossedThresholds(
+        let crossed = SessionQuotaNotificationLogic.crossedThreshold(
             previousRemaining: 60,
             currentRemaining: 45,
-            enabledThresholds: [50, 75, 90],
-            alreadyNotified: [])
-        #expect(crossed == [50])
+            threshold: 50,
+            alreadyNotified: false)
+        #expect(crossed == true)
     }
 
     @Test
     func detectsThreshold75Crossed() {
         // remaining 30% -> remaining 20% means used went from 70% to 80%, crossing 75%
-        let crossed = SessionQuotaNotificationLogic.crossedThresholds(
+        let crossed = SessionQuotaNotificationLogic.crossedThreshold(
             previousRemaining: 30,
             currentRemaining: 20,
-            enabledThresholds: [50, 75, 90],
-            alreadyNotified: [50])
-        #expect(crossed == [75])
+            threshold: 75,
+            alreadyNotified: false)
+        #expect(crossed == true)
     }
 
     @Test
     func detectsThreshold90Crossed() {
         // remaining 15% -> remaining 5% means used went from 85% to 95%, crossing 90%
-        let crossed = SessionQuotaNotificationLogic.crossedThresholds(
+        let crossed = SessionQuotaNotificationLogic.crossedThreshold(
             previousRemaining: 15,
             currentRemaining: 5,
-            enabledThresholds: [50, 75, 90],
-            alreadyNotified: [50, 75])
-        #expect(crossed == [90])
+            threshold: 90,
+            alreadyNotified: false)
+        #expect(crossed == true)
     }
 
     @Test
-    func detectsMultipleThresholdsCrossed() {
-        // remaining 95% -> remaining 40% means used went from 5% to 60%, crossing 50%
-        // (75 and 90 are not crossed because usage is only at 60%)
-        let crossed = SessionQuotaNotificationLogic.crossedThresholds(
-            previousRemaining: 95,
-            currentRemaining: 40,
-            enabledThresholds: [50, 75, 90],
-            alreadyNotified: [])
-        #expect(crossed == [50])
-    }
-
-    @Test
-    func detectsMultipleThresholdsInBigDrop() {
-        // remaining 95% -> remaining 5% means used went from 5% to 95%, crossing 50%, 75%, and 90%
-        let crossed = SessionQuotaNotificationLogic.crossedThresholds(
-            previousRemaining: 95,
-            currentRemaining: 5,
-            enabledThresholds: [50, 75, 90],
-            alreadyNotified: [])
-        #expect(crossed == [50, 75, 90])
-    }
-
-    @Test
-    func ignoresAlreadyNotifiedThresholds() {
+    func ignoresAlreadyNotifiedThreshold() {
         // Should not notify for 50% again if already notified
-        let crossed = SessionQuotaNotificationLogic.crossedThresholds(
+        let crossed = SessionQuotaNotificationLogic.crossedThreshold(
             previousRemaining: 60,
             currentRemaining: 45,
-            enabledThresholds: [50, 75, 90],
-            alreadyNotified: [50])
-        #expect(crossed == [])
+            threshold: 50,
+            alreadyNotified: true)
+        #expect(crossed == false)
     }
 
     @Test
     func ignoresThresholdNotCrossed() {
         // remaining 55% -> remaining 52% means used went from 45% to 48%, not crossing 50%
-        let crossed = SessionQuotaNotificationLogic.crossedThresholds(
+        let crossed = SessionQuotaNotificationLogic.crossedThreshold(
             previousRemaining: 55,
             currentRemaining: 52,
-            enabledThresholds: [50, 75, 90],
-            alreadyNotified: [])
-        #expect(crossed == [])
+            threshold: 50,
+            alreadyNotified: false)
+        #expect(crossed == false)
     }
 
     @Test
     func ignoresWhenUsageDecreases() {
         // remaining goes up (usage goes down), should not trigger
-        let crossed = SessionQuotaNotificationLogic.crossedThresholds(
+        let crossed = SessionQuotaNotificationLogic.crossedThreshold(
             previousRemaining: 40,
             currentRemaining: 60,
-            enabledThresholds: [50, 75, 90],
-            alreadyNotified: [])
-        #expect(crossed == [])
+            threshold: 50,
+            alreadyNotified: false)
+        #expect(crossed == false)
     }
 
     // MARK: - Threshold Clearing Tests
@@ -131,31 +108,34 @@ struct SessionQuotaNotificationLogicTests {
     @Test
     func clearsThresholdWhenUsageDrops() {
         // remaining 60% means used 40%, which is below 50%, so clear 50%
-        let cleared = SessionQuotaNotificationLogic.clearedThresholds(
+        let cleared = SessionQuotaNotificationLogic.clearedThreshold(
             previousRemaining: 45,
             currentRemaining: 60,
-            alreadyNotified: [50])
-        #expect(cleared == [50])
+            threshold: 50,
+            alreadyNotified: true)
+        #expect(cleared == true)
     }
 
     @Test
-    func clearsMultipleThresholds() {
-        // Usage dropping from 95% remaining to put used way below thresholds
-        let cleared = SessionQuotaNotificationLogic.clearedThresholds(
-            previousRemaining: 5,
-            currentRemaining: 95,
-            alreadyNotified: [50, 75, 90])
-        #expect(cleared == [50, 75, 90])
+    func doesNotClearThresholdIfNotNotified() {
+        // If never notified, nothing to clear
+        let cleared = SessionQuotaNotificationLogic.clearedThreshold(
+            previousRemaining: 45,
+            currentRemaining: 60,
+            threshold: 50,
+            alreadyNotified: false)
+        #expect(cleared == false)
     }
 
     @Test
     func doesNotClearThresholdStillExceeded() {
         // remaining 40% = 60% used, 50% threshold is still exceeded
-        let cleared = SessionQuotaNotificationLogic.clearedThresholds(
+        let cleared = SessionQuotaNotificationLogic.clearedThreshold(
             previousRemaining: 30,
             currentRemaining: 40,
-            alreadyNotified: [50, 75])
-        #expect(cleared == [75])
+            threshold: 50,
+            alreadyNotified: true)
+        #expect(cleared == false)
     }
 
     // MARK: - Window Reset Detection Tests
